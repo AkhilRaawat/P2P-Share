@@ -1,76 +1,85 @@
-# PeerLink UI
+# Shareit UI
 
-This is the frontend UI for the PeerLink P2P file sharing application. It's built with Next.js, TypeScript, and Tailwind CSS.
+A modern, beautiful, and feature-rich frontend for peer-to-peer file sharing, built with Next.js, React, and Tailwind CSS.
 
-## Features
+---
 
-- Drag and drop file upload
-- File sharing via invite codes (port numbers)
-- File downloading using invite codes
-- Modern, responsive UI
+## 🚀 Project Overview
 
-## Prerequisites
+Shareit UI lets you share files instantly and securely with anyone, using a simple code. No accounts, no cloud storage—just direct, private, peer-to-peer sharing with a delightful user experience.
 
-- Node.js 18+ and npm
-- Java 11+ (for the backend)
+---
 
-## Getting Started
+## ✨ Features
 
-### Install Dependencies
+- **Modern, Responsive UI**: Glassmorphism, gradients, and smooth animations for a professional look.
+- **Drag-and-Drop Upload**: Effortlessly select or drag multiple files to share.
+- **File Previews**: See thumbnails for images, icons for videos, PDFs, and other file types before sharing.
+- **Multi-File Sharing**: Select and share multiple files in one go.
+- **Progress Feedback**: Animated progress bars and checkmarks for uploads/downloads.
+- **Copyable Share Code**: Instantly copy the generated code to your clipboard.
+- **Recent Activity**: Local-only history of your recent shares and downloads.
+- **Tab-Based Navigation**: Clean toggle between "Share a File" and "Receive a File".
+- **Advanced Share Options** (collapsible):
+  - Password protection (set a password for your files)
+  - Expiration timer (set how long the code is valid)
+  - One-time download (make the file/code usable only once)
+- **Accessibility**: Keyboard navigation, focus states, and screen reader friendly.
+- **Mobile Friendly**: Works great on phones, tablets, and desktops.
 
-```bash
-cd ui
-npm install
-```
+---
 
-### Development Server
+## 🛠️ Tech Stack
 
-```bash
-npm run dev
-```
+- [Next.js](https://nextjs.org/) (App Router)
+- [React](https://react.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [React Icons](https://react-icons.github.io/react-icons/)
 
-This will start the development server on [http://localhost:3000](http://localhost:3000).
+---
 
-### Build for Production
+## 🚦 Getting Started
 
-```bash
-npm run build
-```
+1. **Install dependencies:**
+   ```bash
+   cd ui
+   npm install
+   ```
+2. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+   The app will be available at [http://localhost:3000](http://localhost:3000).
 
-### Start Production Server
+---
 
-```bash
-npm start
-```
+## 📦 Usage
 
-## How to Use
+1. **Share a File:**
+   - Go to the "Share a File" tab.
+   - Drag and drop or select one or more files.
+   - (Optional) Click "Advanced Share" to set a password, expiration, or one-time download.
+   - Click "Share File". Copy the code and send it to your recipient.
 
-1. **Share a File**:
-   - Go to the "Share a File" tab
-   - Drag and drop a file or click to select one
-   - Once uploaded, you'll receive an invite code (port number)
-   - Share this invite code with anyone you want to share the file with
+2. **Receive a File:**
+   - Go to the "Receive a File" tab.
+   - Enter the code (and password, if required).
+   - Click "Download File" to receive your files.
 
-2. **Receive a File**:
-   - Go to the "Receive a File" tab
-   - Enter the invite code you received
-   - Click "Download File"
-   - The file will be downloaded to your device
+---
 
-## Backend Integration
+## 🖼️ Screenshots
 
-The UI communicates with the Java backend running on port 8080. Make sure the backend server is running before using the UI.
+> _Add screenshots here to showcase the UI!_
 
-To start the backend server:
+---
 
-```bash
-cd ..  # Go back to the project root
-mvn clean package
-java -jar target/p2p-1.0-SNAPSHOT.jar
-```
+## 🤝 Contributing
 
-## Project Structure
+Pull requests and suggestions are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
-- `src/app`: Next.js app router pages
-- `src/components`: React components
-- `public`: Static assets
+---
+
+## 📄 License
+
+MIT
