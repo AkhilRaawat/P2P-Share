@@ -57,12 +57,27 @@ public class FileSharer {
         @Override
         public void run() {
             try (FileInputStream fis = new FileInputStream(filePath);
-                 OutputStream oss = clientSocket.getOutputStream()) {
+                 OutputStream oss = clientSocket.getOutputStream();
+                 DataOutputStream dos = new DataOutputStream(oss)) {
                 
-                // Send the filename as a header
-                String filename = new File(filePath).getName();
-                String header = "Filename: " + filename + "\n";
-                oss.write(header.getBytes());
+                // Send the filename in a more robust way
+                String fullFilename = new File(filePath).getName();
+                String filename = fullFilename;
+                
+                // Remove UUID prefix if present (format: uuid_originalname.ext)
+                if (fullFilename.contains("_") && fullFilename.length() > 37) {
+                    // UUID is 36 characters + 1 underscore = 37 characters
+                    String potentialUuid = fullFilename.substring(0, 36);
+                    if (potentialUuid.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) {
+                        filename = fullFilename.substring(37); // Remove UUID_ prefix
+                    }
+                }
+                
+                System.out.println("Sending filename: " + filename + " (from: " + fullFilename + ")");
+                
+                // Send filename length first, then filename, then file content
+                dos.writeInt(filename.length());
+                dos.writeUTF(filename);
                 
                 // Send the file content
                 byte[] buffer = new byte[4096];
@@ -70,6 +85,7 @@ public class FileSharer {
                 while ((bytesRead = fis.read(buffer)) != -1) {
                     oss.write(buffer, 0, bytesRead);
                 }
+                oss.flush();
                 System.out.println("File '" + filename + "' sent to " + clientSocket.getInetAddress());
             } catch (IOException e) {
                 System.err.println("Error sending file to client: " + e.getMessage());

@@ -1,12 +1,14 @@
 "use client";
 import React, { useRef, useState, useEffect } from "react";
-import { FiUploadCloud, FiDownloadCloud, FiFile, FiCheckCircle, FiCopy, FiImage, FiVideo, FiFileText } from "react-icons/fi";
+import { FiUploadCloud, FiDownloadCloud, FiFile, FiCheckCircle, FiCopy, FiImage, FiVideo, FiFileText, FiTrash2 } from "react-icons/fi";
+import { uploadFile, downloadFile, checkServerStatus, getServerStatusDetails } from "@/lib/api";
 
 export default function HomePage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [shareCode, setShareCode] = useState<string>("");  // Add this to store the actual code
   const [receiveCode, setReceiveCode] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -28,6 +30,7 @@ export default function HomePage() {
   const [codeUsed, setCodeUsed] = useState(false); // simulate for receiver
   const [codeExpired, setCodeExpired] = useState(false); // simulate for receiver
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Load history from localStorage
   useEffect(() => {
@@ -42,62 +45,121 @@ export default function HomePage() {
     localStorage.setItem("p2p-history", JSON.stringify(newHistory));
   };
 
-  // Placeholder upload handler
+  // Clear history function
+  const clearHistory = () => {
+    setShowClearConfirm(true);
+  };
+
+  const confirmClearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem("p2p-history");
+    setShowClearConfirm(false);
+  };
+
+  // Real upload handler using backend API
   const handleFileUpload = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (selectedFiles.length === 0) return;
+    
     setUploading(true);
     setUploadSuccess(null);
     setUploadError(null);
     setUploadProgress(0);
     setShowUploadCheck(false);
-    // Simulate progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 20 + 10;
-      setUploadProgress(Math.min(progress, 100));
-      if (progress >= 100) {
-        clearInterval(interval);
-        setUploading(false);
-        setShowUploadCheck(true);
-        setTimeout(() => {
-          setShowUploadCheck(false);
-          setUploadSuccess(`Files shared! Your code is: 12345`);
-          selectedFiles.forEach(file => {
-            addHistory({ type: "share", name: file.name, time: new Date().toLocaleString() });
-          });
-        }, 1200);
+    setShareCode("");  // Clear previous share code
+
+    try {
+      // Check if server is running with detailed info
+      console.log('Checking backend server status...');
+      const serverStatus = await getServerStatusDetails();
+      console.log('Server status:', serverStatus);
+      
+      if (!serverStatus.isRunning) {
+        throw new Error(`Backend server is not accessible. ${serverStatus.error || 'Please start the Java application on port 8080.'}`);
       }
-    }, 200);
+
+      console.log('Backend server is running, proceeding with upload...');
+      
+      // Upload the first file (for multiple files, you'd need to upload each one)
+      const file = selectedFiles[0];
+      const result = await uploadFile(file, (progress) => {
+        setUploadProgress(progress.percentage);
+      });
+
+      setUploading(false);
+      setShowUploadCheck(true);
+      
+      // Store the actual port number
+      setShareCode(result.port.toString());
+      
+      setTimeout(() => {
+        setShowUploadCheck(false);
+        setUploadSuccess(`Files shared! Your code is: ${result.port}`);
+        selectedFiles.forEach(file => {
+          addHistory({ type: "share", name: file.name, time: new Date().toLocaleString() });
+        });
+      }, 1200);
+
+    } catch (error) {
+      setUploading(false);
+      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+      console.error('Upload error:', error);
+    }
   };
 
-  // Placeholder download handler
+  // Real download handler using backend API
   const handleFileDownload = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!receiveCode.trim()) {
+      setDownloadError("Please enter a valid code");
+      return;
+    }
+
     setDownloading(true);
     setDownloadError(null);
     setDownloadProgress(0);
     setShowDownloadCheck(false);
-    // Simulate progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 20 + 10;
-      setDownloadProgress(Math.min(progress, 100));
-      if (progress >= 100) {
-        clearInterval(interval);
-        setDownloading(false);
-        if (receiveCode === "12345") {
-          setShowDownloadCheck(true);
-          setTimeout(() => {
-            setShowDownloadCheck(false);
-            alert("File download started (simulated)");
-            addHistory({ type: "download", name: `Code: ${receiveCode}`, time: new Date().toLocaleString() });
-          }, 1200);
-        } else {
-          setDownloadError("Invalid code or file not found.");
-        }
+
+    try {
+      // Check if server is running
+      const serverRunning = await checkServerStatus();
+      if (!serverRunning) {
+        throw new Error('Backend server is not running. Please start the Java application on port 8080.');
       }
-    }, 200);
+
+      // Parse port from receiveCode (assuming receiveCode is the port number)
+      const port = parseInt(receiveCode.trim());
+      if (isNaN(port)) {
+        throw new Error('Invalid code format. Please enter a valid port number.');
+      }
+
+      const result = await downloadFile(port, (progress) => {
+        setDownloadProgress(progress.percentage);
+      });
+
+      setDownloading(false);
+      setShowDownloadCheck(true);
+
+      // Create a download link and trigger download
+      const url = window.URL.createObjectURL(result.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = result.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setTimeout(() => {
+        setShowDownloadCheck(false);
+        addHistory({ type: "download", name: result.filename, time: new Date().toLocaleString() });
+      }, 1200);
+
+    } catch (error) {
+      setDownloading(false);
+      setDownloadError(error instanceof Error ? error.message : 'Download failed');
+      console.error('Download error:', error);
+    }
   };
 
   // Helper function to get file type icon/preview
@@ -309,11 +371,11 @@ export default function HomePage() {
             {uploadSuccess && (
               <div className="mt-6 flex flex-col items-center gap-3 animate-fade-in">
                 <div className="flex items-center gap-2 bg-primary-50/80 border border-primary-200 rounded-lg px-4 py-2">
-                  <span className="font-mono text-primary-700 text-lg select-all">12345</span>
+                  <span className="font-mono text-primary-700 text-lg select-all">{shareCode}</span>
                   <button
                     className="ml-2 px-2 py-1 rounded bg-primary-200 hover:bg-primary-300 text-primary-800 font-semibold flex items-center gap-1 transition-colors"
                     onClick={() => {
-                      navigator.clipboard.writeText("12345");
+                      navigator.clipboard.writeText(shareCode);
                       setCopied(true);
                       setTimeout(() => setCopied(false), 1200);
                     }}
@@ -400,7 +462,18 @@ export default function HomePage() {
       </div>
       {/* History section */}
       <div className="w-full max-w-2xl mt-10">
-        <h3 className="text-lg font-semibold text-primary-700 mb-2">Recent Activity</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-primary-700">Recent Activity</h3>
+          {history.length > 0 && (
+            <button
+              onClick={clearHistory}
+              className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1 rounded-lg transition-colors duration-200 font-medium"
+            >
+              <FiTrash2 className="w-4 h-4" />
+              Clear History
+            </button>
+          )}
+        </div>
         {history.length === 0 ? (
           <div className="text-primary-400">No recent activity.</div>
         ) : (
@@ -420,6 +493,33 @@ export default function HomePage() {
           </ul>
         )}
       </div>
+
+      {/* Clear History Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Clear History</h3>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to clear all activity history? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmClearHistory}
+                className="px-4 py-2 bg-red-500 text-white hover:bg-red-600 rounded-lg transition-colors duration-200 font-medium"
+              >
+                Clear History
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="mt-12 text-primary-400 text-sm">&copy; {new Date().getFullYear()} Shareit. All rights reserved.</footer>
     </div>
   );

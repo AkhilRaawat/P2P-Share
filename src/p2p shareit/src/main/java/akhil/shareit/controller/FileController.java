@@ -65,8 +65,20 @@ public class FileController {
                 return;
             }
             
-            String response = "Not Found";
-            exchange.sendResponseHeaders(404, response.getBytes().length);
+            // Provide helpful information for the root URL
+            String response = "{\n" +
+                "  \"status\": \"running\",\n" +
+                "  \"message\": \"P2P FileSharer Backend Server\",\n" +
+                "  \"version\": \"1.0\",\n" +
+                "  \"endpoints\": {\n" +
+                "    \"upload\": \"POST /upload\",\n" +
+                "    \"download\": \"GET /download/{port}\"\n" +
+                "  },\n" +
+                "  \"frontend\": \"http://localhost:3000\"\n" +
+                "}";
+            
+            headers.add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.getBytes().length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(response.getBytes());
             }
@@ -167,6 +179,14 @@ public class FileController {
         public void handle(HttpExchange exchange) throws IOException {
             Headers headers = exchange.getResponseHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization");
+            
+            // Handle preflight OPTIONS request
+            if (exchange.getRequestMethod().equalsIgnoreCase("OPTIONS")) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
             
             if (!exchange.getRequestMethod().equalsIgnoreCase("POST")) {
                 String response = "Method Not Allowed";
@@ -247,6 +267,15 @@ public class FileController {
         public void handle(HttpExchange exchange) throws IOException {
             Headers headers = exchange.getResponseHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization");
+            headers.add("Access-Control-Expose-Headers", "Content-Disposition,Content-Type");
+            
+            // Handle preflight OPTIONS request
+            if (exchange.getRequestMethod().equalsIgnoreCase("OPTIONS")) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
             
             if (!exchange.getRequestMethod().equalsIgnoreCase("GET")) {
                 String response = "Method Not Allowed";
@@ -264,27 +293,26 @@ public class FileController {
                 int port = Integer.parseInt(portStr);
                 
                 try (Socket socket = new Socket("localhost", port);
-                     InputStream socketInput = socket.getInputStream()) {
+                     InputStream socketInput = socket.getInputStream();
+                     DataInputStream dis = new DataInputStream(socketInput)) {
                     
                     File tempFile = File.createTempFile("download-", ".tmp");
                     String filename = "downloaded-file"; // Default filename
                     
                     try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                        // Read filename using the new protocol
+                        try {
+                            dis.readInt(); // Read filename length (not used)
+                            filename = dis.readUTF();
+                            System.out.println("Received filename from P2P: " + filename);
+                        } catch (Exception e) {
+                            System.err.println("Error reading filename: " + e.getMessage());
+                            // Continue with default filename
+                        }
+                        
+                        // Now read the actual file content
                         byte[] buffer = new byte[4096];
                         int bytesRead;
-                        
-                        ByteArrayOutputStream headerBaos = new ByteArrayOutputStream();
-                        int b;
-                        while ((b = socketInput.read()) != -1) {
-                            if (b == '\n') break;
-                            headerBaos.write(b);
-                        }
-                        
-                        String header = headerBaos.toString().trim();
-                        if (header.startsWith("Filename: ")) {
-                            filename = header.substring("Filename: ".length());
-                        }
-                        
                         while ((bytesRead = socketInput.read(buffer)) != -1) {
                             fos.write(buffer, 0, bytesRead);
                         }
@@ -292,6 +320,7 @@ public class FileController {
                     
                     headers.add("Content-Disposition", "attachment; filename=\"" + filename + "\"");
                     headers.add("Content-Type", "application/octet-stream");
+                    System.out.println("Sending file with Content-Disposition: attachment; filename=\"" + filename + "\"");
                     
                     exchange.sendResponseHeaders(200, tempFile.length());
                     try (OutputStream os = exchange.getResponseBody();
