@@ -1,6 +1,6 @@
 package akhil.shareit.controller;
 
-import akhil.service.FileSharer;
+import akhil.shareit.service.FileSharer;
 
 import java.io.*;
 import java.util.UUID;
